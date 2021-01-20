@@ -8,6 +8,7 @@ beancount = "*"
 flake8 = "*"
 black = "*"
 beancount-comdirect = {editable = true, path = "."}
+pytest = "*"
 
 [packages]
 
