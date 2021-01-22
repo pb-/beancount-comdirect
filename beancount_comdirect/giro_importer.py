@@ -1,6 +1,7 @@
 import re
 from datetime import datetime
 from csv import DictReader
+from functools import reduce
 
 from beancount.core.amount import Amount
 from beancount.core import data
@@ -17,10 +18,6 @@ FIELDS = (
     '',
 )
 HEADER_ROW = ';'.join(f'"{field}"' if field else '' for field in FIELDS)
-TEXT_PATTERN = re.compile(
-    '(Auftraggeber|Empfänger): (?P<payee>.*) '
-    'Buchungstext: (?P<description>.*)'
-)
 
 
 def _skip_preamble(f):
@@ -60,6 +57,46 @@ def _identify(f):
     return False
 
 
+def _finish_key_value(state):
+    if not state['current_key']:
+        return state
+
+    return {
+        **state,
+        'parsed': {
+            **state['parsed'],
+            state['current_key']: ' '.join(state['current_words']),
+        },
+        'current_key': None,
+        'current_words': [],
+    }
+
+
+def _parse_reduce(state, word):
+    keys = ('Auftraggeber', 'Empfänger', 'Buchungstext')
+
+    if word.endswith(':') and word[:-1] in keys:
+        return {
+            **_finish_key_value(state),
+            'current_key': word[:-1],
+            'current_words': [],
+        }
+
+    return {
+        **state,
+        'current_words': [*state['current_words'], word],
+    }
+
+
+def _parse_text(text):
+    result = reduce(
+        _parse_reduce,
+        text.split(' '),
+        {'parsed': {}, 'current_key': None, 'current_words': []},
+    )
+    return _finish_key_value(result)['parsed']
+
+
 def _extract(f, file_name, account):
     entries = []
     line = 1 + _skip_preamble(f)
@@ -67,12 +104,15 @@ def _extract(f, file_name, account):
 
     for row in reader:
         raw_date = row['Buchungstag']
+        if raw_date == 'offen':
+            continue
+        if raw_date.startswith('Umsätze'):
+            break
         raw_amount = row['Umsatz in EUR']
-        booking_text = TEXT_PATTERN.match(row['Buchungstext'])
-        if not booking_text:
-            raise InvalidFormatException(
-                f'could not parse line {line}: {row["Buchungstext"]}')
+        parsed_text = _parse_text(row['Buchungstext'])
 
+        payee = parsed_text.get('Auftraggeber') or parsed_text.get('Empfänger')
+        description = parsed_text.get('Buchungstext')
         date = datetime.strptime(raw_date, '%d.%m.%Y').date()
         amount = Amount(
             Decimal(raw_amount.replace('.', '').replace(',', '.')), 'EUR'
@@ -84,9 +124,9 @@ def _extract(f, file_name, account):
             data.Transaction(
                 meta,
                 date,
-                None,
-                booking_text.group('payee'),
-                booking_text.group('description'),
+                '*',
+                payee,
+                description,
                 data.EMPTY_SET,
                 data.EMPTY_SET,
                 [posting],
