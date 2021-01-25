@@ -8,48 +8,63 @@ from beancount.core import data
 from beancount.core.number import Decimal
 from beancount.ingest import importer
 
+from beancount_comdirect import accounts
+
 ENCODING = 'ISO-8859-1'
-FIELDS = (
-    'Buchungstag',
-    'Wertstellung (Valuta)',
-    'Vorgang',
-    'Buchungstext',
-    'Umsatz in EUR',
-    '',
-)
-HEADER_ROW = ';'.join(f'"{field}"' if field else '' for field in FIELDS)
 
 
-def _skip_preamble(f):
+def _header_row(fields):
+    return ';'.join(f'"{field}"' if field else '' for field in fields)
+
+
+def _pattern_for(account_type):
+    date_pattern = r'\d{2}\.\d{2}\.\d{4}'
+    type_ = re.escape(account_type)
+    return re.compile(
+        f'"Umsätze {type_}";"Zeitraum: {date_pattern} - {date_pattern}";$'
+    )
+
+
+def _skip_preamble(f, account_structure):
     """Skip preamble/header and return the number of lines skipped."""
+    line_number = 0
     first_line = next(f).strip()
-
-    # Older exports (ca. 2016) do not have a preamble
-    if first_line == HEADER_ROW:
-        return 1
+    line_number += 1
 
     if first_line != ';':
         raise InvalidFormatException
 
-    date_pattern = r'\d{2}\.\d{2}\.\d{4}'
-    preamble_patterns = (
-        f'"Umsätze Girokonto";"Zeitraum: {date_pattern} - {date_pattern}";$',
-        '"Neuer Kontostand";"[0-9,.]+ EUR";$',
-        '$',
-        re.escape(HEADER_ROW) + '$',
-    )
+    account_header_pattern = _pattern_for(account_structure['label'])
 
-    for pattern in preamble_patterns:
+    while True:
         line = next(f).strip()
-        if not re.compile(pattern).match(line):
+        line_number += 1
+        if account_header_pattern.match(line):
+            break
+
+    if account_structure['type'] != accounts.BROKERAGE:
+        line = next(f).strip()
+        line_number += 1
+        balance_pattern = '"Neuer Kontostand";"[0-9,.]+ EUR";$'
+        if not re.compile(balance_pattern).match(line):
             raise InvalidFormatException
 
-    return 5
+    line = next(f).strip()
+    line_number += 1
+    if line:
+        raise InvalidFormatException
+
+    line = next(f).strip()
+    line_number += 1
+    if line != _header_row(account_structure['fields']):
+        raise InvalidFormatException
+
+    return line_number
 
 
-def _identify(f):
+def _identify(f, account_structure):
     try:
-        _skip_preamble(f)
+        _skip_preamble(f, account_structure)
         return True
     except (InvalidFormatException, StopIteration):
         pass
@@ -97,16 +112,20 @@ def _parse_text(text):
     return _finish_key_value(result)['parsed']
 
 
-def _extract(f, file_name, account):
+def _extract(f, file_name, account_structure, account):
     entries = []
-    line = 1 + _skip_preamble(f)
-    reader = DictReader(f, fieldnames=FIELDS, delimiter=';')
+    line = 1 + _skip_preamble(f, account_structure)
+    reader = DictReader(
+        f, fieldnames=account_structure['fields'], delimiter=';'
+    )
 
     for row in reader:
         raw_date = row['Buchungstag']
         if raw_date == 'offen':
+            # These are incomplete
             continue
         if raw_date.startswith('Umsätze'):
+            # Next account type starts here
             break
         raw_amount = row['Umsatz in EUR']
         parsed_text = _parse_text(row['Buchungstext'])
@@ -139,7 +158,8 @@ def _extract(f, file_name, account):
 
 
 class GiroImporter(importer.ImporterProtocol):
-    def __init__(self, account):
+    def __init__(self, account_type, account):
+        self.account_structure = accounts.STRUCTURE[account_type]
         self.account = account
 
     def file_account(self, _):
@@ -147,11 +167,13 @@ class GiroImporter(importer.ImporterProtocol):
 
     def identify(self, file_memo):
         with open(file_memo.name, encoding=ENCODING) as f:
-            return _identify(f)
+            return _identify(f, self.account_structure)
 
     def extract(self, file_memo, existing_entries=None):
         with open(file_memo.name, encoding=ENCODING) as f:
-            return _extract(f, file_memo.name, self.account)
+            return _extract(
+                f, file_memo.name, self.account_structure, self.account
+            )
 
 
 class InvalidFormatException(Exception):
