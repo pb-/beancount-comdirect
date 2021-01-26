@@ -1,5 +1,7 @@
 from io import StringIO
 from textwrap import dedent
+from datetime import date
+from decimal import Decimal
 
 from beancount_comdirect.giro_importer import _identify, _extract
 from beancount_comdirect import accounts
@@ -107,3 +109,26 @@ def test_extract_basic():
     )
 
     assert len(transactions) == 2
+    first, second = transactions
+
+    assert first.date == date(2021, 1, 6)
+    assert first.payee == 'PayPal (Europe) S.a.r.l. et Cie., S.C.A.'
+    assert (
+        first.narration
+        == '. FLIPDISH, Ihr Einkauf bei FLIPDIS H Ref. AA00000000000000/0000'
+    )
+    assert len(first.postings) == 1
+    [posting] = first.postings
+    assert posting.account == 'some-acc'
+    assert posting.units.number == Decimal('-9')
+
+    assert second.date == date(2021, 1, 4)
+    assert (
+        second.payee
+        == 'Max MusterKto/IBAN: DE00000000000000000000 BLZ/BIC: XXXXXXXXXXX'
+    )
+    assert second.narration == 'Miete Schlossallee 1 Ref. A000000000000000/0'
+    assert len(second.postings) == 1
+    [posting] = second.postings
+    assert posting.account == 'some-acc'
+    assert posting.units.number == Decimal('-12001.02')
