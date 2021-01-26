@@ -6,7 +6,7 @@ A [beancount](https://github.com/beancount/beancount) importer for [comdirect](h
 ## Usage
 
 ```python
-from beancount_comdirect.giro_importer import GiroImporter
+from beancount_comdirect.multi_importer import MultiImporter
 from beancount_comdirect.accounts import (
     CHECKING, SAVINGS, BROKERAGE, CREDIT
 )
@@ -15,9 +15,9 @@ CONFIG = [
     # Note that you have to configure the importer once per each account type
     # that want to enable (CSVs always contain all accounts).
 
-    GiroImporter(CHECKING, 'Assets:Checking'),
-    # GiroImporter(SAVINGS, 'Assets:Savings'),
-    # GiroImporter(BROKERAGE, 'Assets:Stocks'),
-    # GiroImporter(CREDIT, 'Liabilities:Credit'),
+    MultiImporter(CHECKING, 'Assets:Checking'),
+    # MultiImporter(SAVINGS, 'Assets:Savings'),
+    # MultiImporter(BROKERAGE, 'Assets:Stocks'),
+    # MultiImporter(CREDIT, 'Liabilities:Credit'),
 ]
 ```

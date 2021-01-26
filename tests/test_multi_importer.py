@@ -3,7 +3,7 @@ from textwrap import dedent
 from datetime import date
 from decimal import Decimal
 
-from beancount_comdirect.giro_importer import _identify, _extract
+from beancount_comdirect.multi_importer import _identify, _extract
 from beancount_comdirect import accounts
 
 

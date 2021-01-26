@@ -157,7 +157,7 @@ def _extract(f, file_name, account_structure, account):
     return entries
 
 
-class GiroImporter(importer.ImporterProtocol):
+class MultiImporter(importer.ImporterProtocol):
     def __init__(self, account_type, account):
         self.account_structure = accounts.STRUCTURE[account_type]
         self.account = account
