@@ -131,7 +131,7 @@ def _extract(f, file_name, account_structure, account):
         parsed_text = _parse_text(row['Buchungstext'])
 
         payee = parsed_text.get('Auftraggeber') or parsed_text.get('Empfänger')
-        description = parsed_text.get('Buchungstext')
+        description = parsed_text.get('Buchungstext') or row['Buchungstext']
         date = datetime.strptime(raw_date, '%d.%m.%Y').date()
         amount = Amount(
             Decimal(raw_amount.replace('.', '').replace(',', '.')), 'EUR'

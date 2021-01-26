@@ -132,3 +132,31 @@ def test_extract_basic():
     [posting] = second.postings
     assert posting.account == 'some-acc'
     assert posting.units.number == Decimal('-12001.02')
+
+
+def test_extract_credit():
+    contents = """\
+        ;
+        "Umsätze Visa-Karte (Kreditkarte)";"Zeitraum: 01.10.2010 - 16.01.2021";
+        "Neuer Kontostand";"0,00 EUR";
+
+        "Buchungstag";"Umsatztag";"Vorgang";"Referenz";"Buchungstext";"Umsatz in EUR";
+        "30.04.2020";"30.04.2020";"Visa-Kartenabrechnung";"000000000000801";" SUMME MONATSABRECHNUNG VISA ";"56,10";
+        """  # noqa
+    transactions = _extract(
+        StringIO(dedent(contents)),
+        'some-file',
+        accounts.STRUCTURE[accounts.CREDIT],
+        'some-acc',
+    )
+
+    assert len(transactions) == 1
+    [transaction] = transactions
+
+    assert transaction.date == date(2020, 4, 30)
+    assert not transaction.payee
+    assert transaction.narration == ' SUMME MONATSABRECHNUNG VISA '
+    assert len(transaction.postings) == 1
+    [posting] = transaction.postings
+    assert posting.account == 'some-acc'
+    assert posting.units.number == Decimal('56.10')
