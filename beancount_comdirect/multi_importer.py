@@ -6,6 +6,7 @@ from functools import reduce
 from beancount.core.amount import Amount
 from beancount.core import data
 from beancount.core.number import Decimal
+from beancount.core.position import Cost
 from beancount.ingest import importer
 
 from beancount_comdirect import accounts
@@ -112,6 +113,10 @@ def _parse_text(text):
     return _finish_key_value(result)['parsed']
 
 
+def _number_to_us(number):
+    return number.replace('.', '').replace(',', '.')
+
+
 def _extract(f, file_name, account_structure, account):
     entries = []
     line = 1 + _skip_preamble(f, account_structure)
@@ -128,29 +133,72 @@ def _extract(f, file_name, account_structure, account):
             # Next account type starts here
             break
         raw_amount = row['Umsatz in EUR']
-        parsed_text = _parse_text(row['Buchungstext'])
-
-        payee = parsed_text.get('Auftraggeber') or parsed_text.get('Empfänger')
-        description = parsed_text.get('Buchungstext') or row['Buchungstext']
         date = datetime.strptime(raw_date, '%d.%m.%Y').date()
-        amount = Amount(
-            Decimal(raw_amount.replace('.', '').replace(',', '.')), 'EUR'
-        )
-        posting = data.Posting(account, amount, None, None, None, None)
+        amount = Amount(Decimal(_number_to_us(raw_amount)), 'EUR')
         meta = data.new_metadata(file_name, line)
 
-        entries.append(
-            data.Transaction(
-                meta,
-                date,
-                '*',
-                payee,
-                description,
-                data.EMPTY_SET,
-                data.EMPTY_SET,
-                [posting],
+        if account_structure['type'] != accounts.BROKERAGE:
+            parsed_text = _parse_text(row['Buchungstext'])
+
+            payee = parsed_text.get('Auftraggeber') or parsed_text.get(
+                'Empfänger'
             )
-        )
+            description = (
+                parsed_text.get('Buchungstext') or row['Buchungstext']
+            )
+            posting = data.Posting(account, amount, None, None, None, None)
+
+            entries.append(
+                data.Transaction(
+                    meta,
+                    date,
+                    '*',
+                    payee,
+                    description,
+                    data.EMPTY_SET,
+                    data.EMPTY_SET,
+                    [posting],
+                )
+            )
+        else:  # BROKERAGE
+            cash_account = 'FIXME:cash'
+            fees_account = 'FIXME:fees'
+
+            instrument = row['WKN']
+            instrument_units = Amount(Decimal(row['Stück / Nom.']), instrument)
+            per_unit_cost = Cost(
+                Decimal(_number_to_us(row['Ausführungskurs'])),
+                row['Währung'],
+                None,
+                None,
+            )
+            description = row['Bezeichnung']
+
+            postings = [
+                data.Posting(cash_account, -amount, None, None, None, None),
+                data.Posting(fees_account, None, None, None, None, None),
+                data.Posting(
+                    account,
+                    instrument_units,
+                    per_unit_cost,
+                    None,
+                    None,
+                    None,
+                ),
+            ]
+
+            entries.append(
+                data.Transaction(
+                    meta,
+                    date,
+                    '*',
+                    None,
+                    description,
+                    data.EMPTY_SET,
+                    data.EMPTY_SET,
+                    postings,
+                )
+            )
 
         line += 1
 

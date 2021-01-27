@@ -160,3 +160,33 @@ def test_extract_credit():
     [posting] = transaction.postings
     assert posting.account == 'some-acc'
     assert posting.units.number == Decimal('56.10')
+
+
+def test_extract_brokerage():
+    contents = """\
+        ;
+        "Umsätze Depot";"Zeitraum: 01.10.2010 - 16.01.2021";
+
+        "Buchungstag";"Geschäftstag";"Stück / Nom.";"Bezeichnung";"WKN";"Währung";"Ausführungskurs";"Umsatz in EUR";
+        "15.04.2020";"14.04.2020";"100";"SAP SE";"716460";"EUR";"51,91";"5.200,30";
+        """  # noqa
+    transactions = _extract(
+        StringIO(dedent(contents)),
+        'some-file',
+        accounts.STRUCTURE[accounts.BROKERAGE],
+        'some-acc',
+    )
+
+    assert len(transactions) == 1
+    [transaction] = transactions
+    assert transaction.date == date(2020, 4, 15)
+    assert not transaction.payee
+    assert transaction.narration == 'SAP SE'
+    assert len(transaction.postings) == 3
+    cash, fee, instrument = transaction.postings
+    assert cash.units.number == Decimal('-5200.30')
+    assert not fee.units
+    assert instrument.units.number == 100
+    assert instrument.units.currency == '716460'
+    assert instrument.cost.number == Decimal('51.91')
+    assert instrument.cost.currency == 'EUR'
