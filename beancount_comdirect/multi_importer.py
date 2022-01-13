@@ -25,39 +25,6 @@ def _pattern_for(account_type):
         f'"Umsätze {type_}";"Zeitraum: {date_pattern} - {date_pattern}";$'
     )
 
-
-def _skip_preamble(f, account_structure):
-    """Skip preamble/header and return the number of lines skipped."""
-    line_number = 0
-    line_number += 1
-
-    account_header_pattern = _pattern_for(account_structure['label'])
-
-    while True:
-        line = next(f).strip()
-        line_number += 1
-        if account_header_pattern.match(line):
-            break
-
-    if account_structure['type'] != accounts.BROKERAGE:
-        line = next(f).strip()
-        line_number += 1
-        balance_pattern = '"Neuer Kontostand";"[0-9,.]+ EUR";$'
-        if not re.compile(balance_pattern).match(line):
-            raise InvalidFormatException
-
-    line = next(f).strip()
-    line_number += 1
-    if line:
-        raise InvalidFormatException
-
-    line = next(f).strip()
-    line_number += 1
-    if line != _header_row(account_structure['fields']):
-        raise InvalidFormatException
-
-    return line_number
-
 def _skip_preamble_balance(f, account_structure):
     """Skip preamble/header and return the number of lines skipped."""
     line_number = 0
@@ -94,6 +61,9 @@ def _skip_preamble_balance(f, account_structure):
         raise InvalidFormatException
 
     return (line_number, raw_amount)
+
+def _skip_preamble(f, account_structure):
+    return _skip_preamble_balance(f, account_structure)[0]
 
 def _identify(f, account_structure):
     try:
