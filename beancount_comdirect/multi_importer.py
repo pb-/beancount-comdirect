@@ -29,7 +29,6 @@ def _pattern_for(account_type):
 def _skip_preamble(f, account_structure):
     """Skip preamble/header and return the number of lines skipped."""
     line_number = 0
-    line_number += 1
 
     account_header_pattern = _pattern_for(account_structure['label'])
 
