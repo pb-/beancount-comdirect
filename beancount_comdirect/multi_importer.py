@@ -25,6 +25,7 @@ def _pattern_for(account_type):
         f'"Umsätze {type_}";"Zeitraum: {date_pattern} - {date_pattern}";$'
     )
 
+
 def _skip_preamble_balance(f, account_structure):
     """Skip preamble/header and return the number of lines skipped."""
     line_number = 0
@@ -62,8 +63,10 @@ def _skip_preamble_balance(f, account_structure):
 
     return (line_number, raw_amount)
 
+
 def _skip_preamble(f, account_structure):
     return _skip_preamble_balance(f, account_structure)[0]
+
 
 def _identify(f, account_structure):
     try:
