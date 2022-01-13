@@ -87,6 +87,8 @@ def _skip_preamble_balance(f, account_structure):
             raise InvalidFormatException
         else:
             raw_amount = m.group('raw_amount')
+    else:
+        raw_amount = False
 
     line = next(f).strip()
     line_number += 1
@@ -198,7 +200,7 @@ def _extract(f, file_name, account_structure, account):
         
         raw_amount = row['Umsatz in EUR']
         date = datetime.strptime(raw_date, '%d.%m.%Y').date()
-        if last_date is False:
+        if last_date is False and closing_balance:
             # trigger on first transaction (newest) -> get date
             # Closing balance extracted from preamble
             entries.append(data.Balance(

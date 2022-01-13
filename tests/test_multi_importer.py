@@ -108,8 +108,11 @@ def test_extract_basic():
         'some-acc',
     )
 
-    assert len(transactions) == 2
-    first, second = transactions
+    assert len(transactions) == 2 + 1 # 1 balance transaction
+    balance, first, second = transactions
+
+    assert balance.date == date(2021, 1, 7)
+    assert balance.amount.number == Decimal('1134.11') 
 
     assert first.date == date(2021, 1, 6)
     assert first.payee == 'PayPal (Europe) S.a.r.l. et Cie., S.C.A.'
@@ -150,8 +153,11 @@ def test_extract_credit():
         'some-acc',
     )
 
-    assert len(transactions) == 1
-    [transaction] = transactions
+    assert len(transactions) == 1 + 1 # 1 balance transaction
+    balance, transaction = transactions
+
+    assert balance.date == date(2020, 5, 1)
+    assert balance.amount.number == Decimal('0.00') 
 
     assert transaction.date == date(2020, 4, 30)
     assert not transaction.payee
