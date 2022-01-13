@@ -25,7 +25,7 @@ def test_identiy_premature_eof():
 
 def test_identify_minimal_checking_file():
     contents = """\
-        ;
+        
         "Umsätze Girokonto";"Zeitraum: 01.10.2010 - 16.01.2021";
         "Neuer Kontostand";"1.134,11 EUR";
 
@@ -38,7 +38,7 @@ def test_identify_minimal_checking_file():
 
 def test_identify_with_credit_file():
     contents = """\
-        ;
+        
         "Umsätze Girokonto";"Zeitraum: 01.10.2010 - 16.01.2021";
         "Neuer Kontostand";"1.134,11 EUR";
 
@@ -58,7 +58,7 @@ def test_identify_with_credit_file():
 
 def test_identify_with_brokerage_file():
     contents = """\
-        ;
+        
         "Umsätze Girokonto";"Zeitraum: 01.10.2010 - 16.01.2021";
         "Neuer Kontostand";"1.134,11 EUR";
 
@@ -77,7 +77,7 @@ def test_identify_with_brokerage_file():
 
 def test_extract_minimal():
     contents = """\
-        ;
+        
         "Umsätze Girokonto";"Zeitraum: 01.10.2010 - 16.01.2021";
         "Neuer Kontostand";"1.134,11 EUR";
 
@@ -93,7 +93,7 @@ def test_extract_minimal():
 
 def test_extract_basic():
     contents = """\
-        ;
+        
         "Umsätze Girokonto";"Zeitraum: 01.10.2010 - 16.01.2021";
         "Neuer Kontostand";"1.134,11 EUR";
 
@@ -136,7 +136,7 @@ def test_extract_basic():
 
 def test_extract_credit():
     contents = """\
-        ;
+        
         "Umsätze Visa-Karte (Kreditkarte)";"Zeitraum: 01.10.2010 - 16.01.2021";
         "Neuer Kontostand";"0,00 EUR";
 
@@ -164,7 +164,7 @@ def test_extract_credit():
 
 def test_extract_brokerage():
     contents = """\
-        ;
+        
         "Umsätze Depot";"Zeitraum: 01.10.2010 - 16.01.2021";
 
         "Buchungstag";"Geschäftstag";"Stück / Nom.";"Bezeichnung";"WKN";"Währung";"Ausführungskurs";"Umsatz in EUR";
