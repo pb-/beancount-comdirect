@@ -20,9 +20,10 @@ def _header_row(fields):
 
 def _pattern_for(account_type):
     date_pattern = r'\d{2}\.\d{2}\.\d{4}'
+    range_pattern = r'\d+ Tage'
     type_ = re.escape(account_type)
     return re.compile(
-        f'"Umsätze {type_}";"Zeitraum: {date_pattern} - {date_pattern}";$'
+        f'"Umsätze {type_}";"Zeitraum: (({date_pattern} - {date_pattern})|({range_pattern}))";$'
     )
 
 
