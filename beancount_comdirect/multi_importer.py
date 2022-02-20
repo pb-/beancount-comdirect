@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from csv import DictReader
 from functools import reduce
 
@@ -27,7 +27,7 @@ def _pattern_for(account_type):
     )
 
 
-def _skip_preamble(f, account_structure):
+def _skip_preamble_balance(f, account_structure):
     """Skip preamble/header and return the number of lines skipped."""
     line_number = 0
 
@@ -42,9 +42,14 @@ def _skip_preamble(f, account_structure):
     if account_structure['type'] != accounts.BROKERAGE:
         line = next(f).strip()
         line_number += 1
-        balance_pattern = '"Neuer Kontostand";"[0-9,.]+ EUR";$'
-        if not re.compile(balance_pattern).match(line):
+        balance_pattern = '"Neuer Kontostand";"(?P<raw_amount>[0-9,.]+) EUR";$'
+        m = re.compile(balance_pattern).match(line)
+        if not m:
             raise InvalidFormatException
+        else:
+            raw_amount = m.group('raw_amount')
+    else:
+        raw_amount = False
 
     line = next(f).strip()
     line_number += 1
@@ -56,7 +61,11 @@ def _skip_preamble(f, account_structure):
     if line != _header_row(account_structure['fields']):
         raise InvalidFormatException
 
-    return line_number
+    return (line_number, raw_amount)
+
+
+def _skip_preamble(f, account_structure):
+    return _skip_preamble_balance(f, account_structure)[0]
 
 
 def _identify(f, account_structure):
@@ -115,23 +124,62 @@ def _number_to_us(number):
 
 def _extract(f, file_name, account_structure, account):
     entries = []
-    line = 1 + _skip_preamble(f, account_structure)
+    (line, closing_balance) = _skip_preamble_balance(f, account_structure)
+    line += 1
     reader = DictReader(
         f, fieldnames=account_structure['fields'], delimiter=';'
     )
 
+    last_date = False
+
     for row in reader:
         raw_date = row['Buchungstag']
-        if raw_date == 'offen':
-            # These are incomplete
-            continue
+        
+        # Conditions to skip the row / break the loop
         if raw_date.startswith('Umsätze'):
             # Next account type starts here
             break
+        if raw_date == 'Keine Umsätze vorhanden.':
+            # accounts/credit cards with no transactions in this period
+            continue
+        if raw_date == 'offen':
+            # These are incomplete / not booked yet
+            continue
+        
+        meta = data.new_metadata(file_name, line)
+        # assign opening balance
+        if raw_date == 'Alter Kontostand':
+            balance_pattern = '(?P<raw_amount>[0-9,.]+) EUR'
+            m = re.compile(balance_pattern).match(row[account_structure['fields'][1]]) 
+            if m is not False:
+                raw_amount = m.group('raw_amount')
+                entries.append(data.Balance(
+                    data.new_metadata(file_name, line),
+                    last_date,
+                    account,
+                    Amount(Decimal(_number_to_us(raw_amount)), 'EUR'),
+                    None,
+                    None
+                    ))
+            # skips quietly if extraction fails
+            continue
+        
         raw_amount = row['Umsatz in EUR']
         date = datetime.strptime(raw_date, '%d.%m.%Y').date()
+        if last_date is False and closing_balance:
+            # trigger on first transaction (newest) -> get date
+            # Closing balance extracted from preamble
+            entries.append(data.Balance(
+                    data.new_metadata(file_name, line),
+                    # Closing balance is opening balance for next day
+                    date + timedelta(days=1),
+                    account,
+                    Amount(Decimal(_number_to_us(closing_balance)), 'EUR'),
+                    None,
+                    None
+                    ))
+        last_date = date
         amount = Amount(Decimal(_number_to_us(raw_amount)), 'EUR')
-        meta = data.new_metadata(file_name, line)
 
         if account_structure['type'] != accounts.BROKERAGE:
             parsed_text = _parse_text(row['Buchungstext'])
